@@ -14,50 +14,71 @@ public class OrderService {
     private final CartItemRepository cartItemRepository;
     private final UserRepository userRepository;
 
-    public OrderService(OrderRepository orderRepository, CartItemRepository cartItemRepository, UserRepository userRepository) {
+    public OrderService(OrderRepository orderRepository,
+                        CartItemRepository cartItemRepository,
+                        UserRepository userRepository) {
         this.orderRepository = orderRepository;
         this.cartItemRepository = cartItemRepository;
         this.userRepository = userRepository;
     }
 
     public Order placeOrder(String email, OrderRequest request) {
-        User user = userRepository.findByEmail(email).orElseThrow();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
         List<CartItem> cartItems = cartItemRepository.findByUserId(user.getId());
-        if (cartItems.isEmpty()) throw new RuntimeException("Cart is empty");
+
+        if (cartItems == null || cartItems.isEmpty()) {
+            throw new RuntimeException("Cart is empty for user: " + email);
+        }
 
         Order order = new Order();
         order.setUser(user);
         order.setOrderDate(LocalDateTime.now());
         order.setStatus(Order.Status.PENDING);
-        order.setShippingAddress(request.getShippingAddress());
+        order.setShippingAddress(
+            request.getShippingAddress() != null && !request.getShippingAddress().isEmpty()
+                ? request.getShippingAddress() : user.getAddress()
+        );
+        order.setItems(new ArrayList<>());
+        order.setTotalAmount(0.0);
+
+        Order savedOrder = orderRepository.save(order);
 
         double total = 0;
-        List<OrderItem> orderItems = new ArrayList<>();
         for (CartItem cartItem : cartItems) {
             OrderItem orderItem = new OrderItem();
-            orderItem.setOrder(order);
+            orderItem.setOrder(savedOrder);
             orderItem.setProduct(cartItem.getProduct());
             orderItem.setQuantity(cartItem.getQuantity());
             orderItem.setPrice(cartItem.getProduct().getPrice());
             total += cartItem.getProduct().getPrice() * cartItem.getQuantity();
-            orderItems.add(orderItem);
+            savedOrder.getItems().add(orderItem);
         }
-        order.setItems(orderItems);
-        order.setTotalAmount(total);
-        Order saved = orderRepository.save(order);
+
+        savedOrder.setTotalAmount(total);
+        Order finalOrder = orderRepository.save(savedOrder);
+
         cartItemRepository.deleteByUserId(user.getId());
-        return saved;
+
+        return finalOrder;
     }
 
     public List<Order> getMyOrders(String email) {
-        User user = userRepository.findByEmail(email).orElseThrow();
-        return orderRepository.findByUserId(user.getId());
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        List<Order> orders = orderRepository.findByUserId(user.getId());
+        return orders != null ? orders : new ArrayList<>();
     }
 
-    public List<Order> getAllOrders() { return orderRepository.findAll(); }
+    public List<Order> getAllOrders() {
+        List<Order> orders = orderRepository.findAll();
+        return orders != null ? orders : new ArrayList<>();
+    }
 
     public Order updateStatus(Long id, String status) {
-        Order order = orderRepository.findById(id).orElseThrow();
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
         order.setStatus(Order.Status.valueOf(status.toUpperCase()));
         return orderRepository.save(order);
     }

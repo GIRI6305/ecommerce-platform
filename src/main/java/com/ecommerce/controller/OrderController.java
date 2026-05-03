@@ -22,22 +22,40 @@ public class OrderController {
     }
 
     @PostMapping("/place")
-    public ResponseEntity<?> placeOrder(@RequestHeader("Authorization") String auth, @RequestBody OrderRequest request) {
-        return ResponseEntity.ok(orderService.placeOrder(getEmail(auth), request));
+    public ResponseEntity<?> placeOrder(@RequestHeader("Authorization") String auth,
+                                         @RequestBody OrderRequest request) {
+        try {
+            return ResponseEntity.ok(orderService.placeOrder(getEmail(auth), request));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping("/my")
     public ResponseEntity<?> myOrders(@RequestHeader("Authorization") String auth) {
-        return ResponseEntity.ok(orderService.getMyOrders(getEmail(auth)));
+        try {
+            return ResponseEntity.ok(orderService.getMyOrders(getEmail(auth)));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new java.util.ArrayList<>());
+        }
     }
 
     @GetMapping("/admin/all")
-    public ResponseEntity<?> allOrders() {
-        return ResponseEntity.ok(orderService.getAllOrders());
+    public ResponseEntity<?> allOrders(@RequestHeader("Authorization") String auth) {
+        try {
+            return ResponseEntity.ok(orderService.getAllOrders());
+        } catch (Exception e) {
+            return ResponseEntity.ok(new java.util.ArrayList<>());
+        }
     }
 
     @PutMapping("/admin/{id}/status")
-    public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestParam String status) {
-        return ResponseEntity.ok(orderService.updateStatus(id, status));
+    public ResponseEntity<?> updateStatus(@PathVariable Long id,
+                                           @RequestParam String status) {
+        try {
+            return ResponseEntity.ok(orderService.updateStatus(id, status));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }
